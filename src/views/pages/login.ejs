@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Login - Pizzaria Smart</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+<body class="bg-gray-900 text-white h-screen flex items-center justify-center relative overflow-hidden">
+    
+    <div class="absolute -top-20 -left-20 w-64 h-64 bg-orange-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
+    <div class="absolute -bottom-20 -right-20 w-64 h-64 bg-red-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
+
+    <div class="bg-gray-800 p-8 rounded-2xl shadow-2xl w-96 z-10 border border-gray-700">
+        <div class="text-center mb-8">
+            <i class="ph ph-pizza text-5xl text-orange-500 mb-2"></i>
+            <h1 class="text-3xl font-bold">Bem-vindo</h1>
+            <p class="text-gray-400 text-sm">Faça login para continuar</p>
+        </div>
+        
+        <form id="loginForm" class="space-y-5">
+            <div>
+                <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Email</label>
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500"><i class="ph ph-envelope"></i></span>
+                    <input type="email" id="email" class="w-full pl-10 p-3 rounded bg-gray-700 border border-gray-600 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition" placeholder="seu@email.com" required>
+                </div>
+            </div>
+            
+            <div>
+                <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Senha</label>
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500"><i class="ph ph-lock-key"></i></span>
+                    <input type="password" id="password" class="w-full pl-10 p-3 rounded bg-gray-700 border border-gray-600 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition" placeholder="••••••••" required>
+                </div>
+            </div>
+
+            <button type="submit" class="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white font-bold py-3 rounded-lg shadow-lg transform transition hover:scale-[1.02] flex justify-center items-center gap-2">
+                <span>Entrar</span>
+                <i class="ph ph-sign-in"></i>
+            </button>
+        </form>
+
+        <p class="text-center mt-6 text-sm text-gray-400">
+            Ainda não tem conta? 
+            <a href="/register" class="text-orange-500 hover:text-orange-400 font-bold hover:underline transition">Cadastre-se grátis</a>
+        </p>
+        
+        <p id="errorMsg" class="text-red-400 text-center mt-4 text-sm hidden bg-red-900/30 p-2 rounded border border-red-800"></p>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const errorMsg = document.getElementById('errorMsg');
+            const btn = e.target.querySelector('button');
+            const originalBtnText = btn.innerHTML;
+
+            // Feedback visual de carregamento
+            btn.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i>';
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/api/v1/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // SOLUÇÃO DO PONTO 3: Redirecionamento Inteligente
+                    // Se for ADMIN -> Dashboard
+                    // Se for CLIENTE -> Home (Cardápio)
+                    
+                    if (data.user.role === 'admin') {
+                        window.location.href = '/dashboard';
+                    } else {
+                        window.location.href = '/';
+                    }
+
+                } else {
+                    throw new Error(data.error || 'Credenciais inválidas');
+                }
+            } catch (err) {
+                console.error(err);
+                errorMsg.innerText = err.message;
+                errorMsg.classList.remove('hidden');
+                btn.innerHTML = originalBtnText;
+                btn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>KDS - Pizzaria Smart</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen">
+    
+    <header class="bg-gray-800 p-4 shadow-lg border-b border-gray-700 flex justify-between items-center sticky top-0 z-50">
+        <div class="flex items-center gap-3">
+            <i class="ph ph-chef-hat text-3xl text-orange-500"></i>
+            <div>
+                <h1 class="text-xl font-bold">Cozinha / Expedição</h1>
+                <p class="text-xs text-gray-400">Pedidos Ativos</p>
+            </div>
+        </div>
+        <div class="flex gap-4">
+            <div class="text-right">
+                <p class="text-2xl font-bold text-orange-500" id="contador">0</p>
+                <p class="text-xs text-gray-400">Na Fila</p>
+            </div>
+            <a href="/" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded text-sm flex items-center">
+                Sair
+            </a>
+        </div>
+    </header>
+
+    <main class="p-6">
+        <div id="pedidosContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            
+            <% if (pedidos.length === 0) { %>
+                <div id="emptyState" class="col-span-full flex flex-col items-center justify-center py-20 text-gray-600">
+                    <i class="ph ph-cooking-pot text-6xl mb-4"></i>
+                    <p class="text-xl">Tudo limpo por aqui, Chef!</p>
+                </div>
+            <% } %>
+
+            <% pedidos.forEach(pedido => { %>
+                <div id="card-<%= pedido._id %>" class="bg-gray-800 rounded-lg border border-gray-700 shadow-lg flex flex-col relative overflow-hidden group">
+                    
+                    <% 
+                        let borderClass = 'bg-yellow-500'; // Recebido
+                        if(pedido.status === 'Em Preparo') borderClass = 'bg-orange-500';
+                        if(pedido.status === 'Saiu para Entrega') borderClass = 'bg-blue-500';
+                    %>
+                    <div class="absolute left-0 top-0 bottom-0 w-2 <%= borderClass %> transition-colors" id="border-<%= pedido._id %>"></div>
+
+                    <div class="p-4 pl-6 flex-1">
+                        <div class="flex justify-between items-start mb-3">
+                            <span class="font-mono text-xl font-bold text-white">#<%= pedido._id.toString().slice(-4) %></span>
+                            <span class="text-xs bg-gray-700 px-2 py-1 rounded text-gray-300 flex items-center gap-1">
+                                <i class="ph ph-clock"></i>
+                                <%= new Date(pedido.dataCriacao).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) %>
+                            </span>
+                        </div>
+
+                        <ul class="space-y-2 mb-4">
+                            <% pedido.itens.forEach(item => { %>
+                                <li class="flex justify-between items-center border-b border-gray-700 pb-1 last:border-0">
+                                    <span class="font-bold text-lg"><%= item.quantidade %>x</span>
+                                    <span class="text-gray-300 flex-1 ml-2"><%= item.pizza ? item.pizza.nome : '???' %></span>
+                                </li>
+                            <% }) %>
+                        </ul>
+                    </div>
+
+                    <div class="bg-gray-900 p-2 grid grid-cols-3 gap-2">
+                        <button onclick="mudarStatus('<%= pedido._id %>', 'Em Preparo')" class="bg-orange-900 hover:bg-orange-800 text-orange-200 py-2 rounded text-xs font-bold transition">
+                            PREPARAR
+                        </button>
+                        <button onclick="mudarStatus('<%= pedido._id %>', 'Saiu para Entrega')" class="bg-blue-900 hover:bg-blue-800 text-blue-200 py-2 rounded text-xs font-bold transition">
+                            ENTREGAR
+                        </button>
+                        <button onclick="mudarStatus('<%= pedido._id %>', 'Entregue')" class="bg-green-900 hover:bg-green-800 text-green-200 py-2 rounded text-xs font-bold transition">
+                            CONCLUIR
+                        </button>
+                    </div>
+                </div>
+            <% }) %>
+
+        </div>
+    </main>
+
+    <script>
+        const socket = io();
+        
+        // Atualiza contador inicial
+        atualizarContador();
+
+        // 1. CHEGOU PEDIDO NOVO
+        socket.on('novo_pedido', (pedido) => {
+            // Toca sino
+            const audio = new Audio('https://actions.google.com/sounds/v1/alarms/beeping_and_whistling.ogg');
+            audio.volume = 0.4;
+            audio.play().catch(() => {});
+            
+            // Recarrega para pegar o card novo renderizado pelo server (mais seguro pro MVP)
+            // Num app React faríamos append manual, mas com EJS o reload é a estratégia mais robusta
+            location.reload();
+        });
+
+        // 2. FUNÇÃO DE MUDAR STATUS
+        async function mudarStatus(id, status) {
+            try {
+                // UI Otimista: Se for concluir, já remove da tela antes mesmo do servidor responder
+                if (status === 'Entregue') {
+                    const card = document.getElementById(`card-${id}`);
+                    if (card) {
+                        card.style.opacity = '0';
+                        setTimeout(() => card.remove(), 300); // Animaçãozinha
+                        atualizarContador(-1);
+                    }
+                }
+
+                await fetch(`/api/v1/orders/${id}/status`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status })
+                });
+
+                // Se não for 'Entregue', apenas recarregamos para atualizar a cor da borda
+                // (ou poderíamos manipular classes via JS pra ficar mais fluido)
+                if (status !== 'Entregue') {
+                    setTimeout(() => location.reload(), 200);
+                }
+
+            } catch (err) {
+                console.error("Erro ao atualizar", err);
+                alert("Erro de conexão!");
+            }
+        }
+
+        function atualizarContador(delta = 0) {
+            const container = document.getElementById('pedidosContainer');
+            const count = container.children.length + delta;
+            // Ajuste simples para ignorar o div 'emptyState' se existir
+            const realCount = document.getElementById('emptyState') ? 0 : count;
+            document.getElementById('contador').innerText = realCount < 0 ? 0 : realCount;
+        }
+
+        async function logout() {
+    try {
+        // Pede para o servidor destruir o cookie
+        await fetch('/api/v1/auth/logout', { method: 'POST' });
+        
+        // Redireciona para o login
+        window.location.href = '/login';
+    } catch (err) {
+        console.error("Erro ao sair", err);
+        // Se der erro, força o redirecionamento de qualquer jeito
+        window.location.href = '/login';
+    }
+}
+    </script>
+</body>
+</html>

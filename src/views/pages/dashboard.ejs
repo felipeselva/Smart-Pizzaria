@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>CMS - Pizzaria Smart</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex">
+
+    <aside class="bg-gray-900 text-white w-64 min-h-screen p-4 flex flex-col fixed h-full overflow-y-auto z-10">
+        <h1 class="text-2xl font-bold mb-8 text-orange-500 flex items-center gap-2">
+            <i class="ph ph-chart-pie-slice"></i> Smart Admin
+        </h1>
+        <nav class="space-y-2 flex-1">
+            <a href="/dashboard" class="block bg-gray-800 p-3 rounded font-bold border-l-4 border-orange-500">📊 Visão Geral</a>
+            <a href="/cozinha" class="block hover:bg-gray-800 p-3 rounded text-gray-400 transition">👨‍🍳 Cozinha (KDS)</a>
+            <a href="/" class="block hover:bg-gray-800 p-3 rounded text-gray-400 transition">🏠 Ver Loja</a>
+        </nav>
+        <button onclick="location.href='/login'" class="text-sm text-gray-500 mt-auto pt-4 border-t border-gray-800">Sair do Sistema</button>
+    </aside>
+
+    <main class="flex-1 p-8 ml-64">
+        <div class="flex justify-between items-center mb-8">
+            <h2 class="text-3xl font-bold text-gray-800">Dashboard Gerencial</h2>
+            <button onclick="abrirModalCriacao()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-bold shadow-lg flex items-center gap-2 transition transform hover:scale-105">
+                <i class="ph ph-plus-circle text-xl"></i> Nova Pizza
+            </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-lg shadow border-l-4 border-green-500">
+                <p class="text-gray-500 text-sm font-bold uppercase">Faturamento</p>
+                <p class="text-3xl font-bold text-gray-800">R$ <%= kpis.totalVendas.toFixed(2) %></p>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow border-l-4 border-blue-500">
+                <p class="text-gray-500 text-sm font-bold uppercase">Pedidos</p>
+                <p class="text-3xl font-bold text-gray-800"><%= kpis.totalPedidos %></p>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow border-l-4 border-orange-500">
+                <p class="text-gray-500 text-sm font-bold uppercase">Ticket Médio</p>
+                <p class="text-3xl font-bold text-gray-800">R$ <%= kpis.ticketMedio.toFixed(2) %></p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow mb-8 overflow-hidden">
+            <div class="p-6 border-b border-gray-100 flex justify-between items-center">
+                <h3 class="font-bold text-xl text-gray-700">🍕 Gerenciar Cardápio</h3>
+                <span class="text-sm text-gray-400"><%= todasPizzas.length %> itens cadastrados</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-gray-50 text-gray-600 font-bold uppercase">
+                        <tr>
+                            <th class="px-6 py-3">Nome</th>
+                            <th class="px-6 py-3">Categoria</th>
+                            <th class="px-6 py-3">Preço</th>
+                            <th class="px-6 py-3 text-right">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        <% todasPizzas.forEach(pizza => { %>
+                        <tr class="hover:bg-gray-50 transition group">
+                            <td class="px-6 py-4 font-medium text-gray-800"><%= pizza.nome %></td>
+                            <td class="px-6 py-4">
+                                <span class="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full font-bold uppercase"><%= pizza.categoria %></span>
+                            </td>
+                            <td class="px-6 py-4 font-bold text-green-600">R$ <%= pizza.preco.toFixed(2) %></td>
+                            <td class="px-6 py-4 text-right flex justify-end gap-2">
+                                <button onclick="abrirModalEdicao('<%= pizza._id %>', '<%= pizza.nome %>', '<%= pizza.preco %>', '<%= pizza.categoria %>', '<%= pizza.descricao %>', '<%= pizza.ingredientes.join(', ') %>')" 
+                                    class="text-blue-500 hover:text-blue-700 bg-blue-50 p-2 rounded hover:bg-blue-100 transition">
+                                    <i class="ph ph-pencil-simple text-lg"></i>
+                                </button>
+                                <button onclick="deletarPizza('<%= pizza._id %>', '<%= pizza.nome %>')" 
+                                    class="text-red-500 hover:text-red-700 bg-red-50 p-2 rounded hover:bg-red-100 transition">
+                                    <i class="ph ph-trash text-lg"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white p-6 rounded-lg shadow">
+                <h3 class="font-bold text-gray-700 mb-4">Status dos Pedidos</h3>
+                <div class="h-64 flex items-center justify-center"><canvas id="statusChart"></canvas></div>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow">
+                <h3 class="font-bold text-gray-700 mb-4">Últimas Vendas</h3>
+                <div class="overflow-y-auto max-h-64">
+                    <table class="w-full text-sm text-left">
+                        <thead class="text-gray-500 border-b bg-gray-50">
+                            <tr><th class="py-2 pl-2">Cliente</th><th>Total</th><th>Status</th></tr>
+                        </thead>
+                        <tbody>
+                            <% ultimosPedidos.forEach(p => { %>
+                            <tr class="border-b last:border-0 hover:bg-gray-50">
+                                <td class="py-3 pl-2"><%= p.user ? p.user.nome : 'Unknown' %></td>
+                                <td class="text-green-600 font-bold">R$ <%= p.total.toFixed(2) %></td>
+                                <td><span class="px-2 py-1 rounded text-xs bg-gray-100"><%= p.status %></span></td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="pizzaModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center backdrop-blur-sm">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg p-6">
+            <div class="flex justify-between items-center mb-6 border-b pb-2">
+                <h3 id="modalTitle" class="text-2xl font-bold text-gray-800">Nova Pizza</h3>
+                <button onclick="fecharModal()" class="text-gray-400 hover:text-red-500 text-2xl">&times;</button>
+            </div>
+
+            <form id="formPizza" class="space-y-4">
+                <input type="hidden" id="pId"> <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Nome</label>
+                        <input type="text" id="pNome" class="w-full border p-2 rounded outline-none focus:border-orange-500" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Preço (R$)</label>
+                        <input type="number" step="0.01" id="pPreco" class="w-full border p-2 rounded outline-none focus:border-orange-500" required>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">Categoria</label>
+                    <select id="pCategoria" class="w-full border p-2 rounded bg-white">
+                        <option value="Tradicional">Tradicional</option>
+                        <option value="Especial">Especial</option>
+                        <option value="Doce">Doce</option>
+                        <option value="Premium">Premium</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">Ingredientes</label>
+                    <textarea id="pIngredientes" rows="2" class="w-full border p-2 rounded outline-none focus:border-orange-500" placeholder="Separe por vírgula..."></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">Descrição</label>
+                    <input type="text" id="pDescricao" class="w-full border p-2 rounded outline-none focus:border-orange-500">
+                </div>
+
+                <div class="pt-4 flex justify-end gap-2">
+                    <button type="button" onclick="fecharModal()" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">Cancelar</button>
+                    <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded font-bold shadow-lg flex items-center gap-2">
+                        <i class="ph ph-check"></i> Salvar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Gráfico (Mantido)
+        const dadosStatus = <%- JSON.stringify(statusData) %>;
+        new Chart(document.getElementById('statusChart'), {
+            type: 'doughnut',
+            data: {
+                labels: dadosStatus.map(d => d._id),
+                datasets: [{ data: dadosStatus.map(d => d.count), backgroundColor: ['#F59E0B', '#3B82F6', '#10B981', '#EF4444'], borderWidth: 0 }]
+            },
+            options: { responsive: true, plugins: { legend: { position: 'right' } } }
+        });
+
+        // --- LÓGICA DO CRUD ---
+
+        const modal = document.getElementById('pizzaModal');
+        const form = document.getElementById('formPizza');
+
+        // 1. ABRIR PARA CRIAR
+        function abrirModalCriacao() {
+            document.getElementById('modalTitle').innerText = "🍕 Nova Pizza";
+            document.getElementById('pId').value = ""; // Sem ID = Criação
+            form.reset();
+            modal.classList.remove('hidden');
+        }
+
+        // 2. ABRIR PARA EDITAR
+        function abrirModalEdicao(id, nome, preco, categoria, descricao, ingredientes) {
+            document.getElementById('modalTitle').innerText = "✏️ Editar Pizza";
+            document.getElementById('pId').value = id; // Com ID = Edição
+            
+            // Preenche os campos
+            document.getElementById('pNome').value = nome;
+            document.getElementById('pPreco').value = preco;
+            document.getElementById('pCategoria').value = categoria;
+            document.getElementById('pDescricao').value = descricao;
+            document.getElementById('pIngredientes').value = ingredientes;
+            
+            modal.classList.remove('hidden');
+        }
+
+        function fecharModal() { modal.classList.add('hidden'); }
+
+        // 3. SALVAR (Create ou Update)
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const id = document.getElementById('pId').value;
+            const isEdit = !!id; // Se tem ID, é edição
+
+            const payload = {
+                nome: document.getElementById('pNome').value,
+                preco: parseFloat(document.getElementById('pPreco').value),
+                categoria: document.getElementById('pCategoria').value,
+                descricao: document.getElementById('pDescricao').value,
+                ingredientes: document.getElementById('pIngredientes').value.split(',').map(i => i.trim())
+            };
+
+            const url = isEdit ? `/api/v1/pizzas/${id}` : '/api/v1/pizzas';
+            const method = isEdit ? 'PUT' : 'POST';
+
+            try {
+                const res = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (res.ok) {
+                    alert(isEdit ? '✅ Pizza Atualizada!' : '✅ Pizza Criada!');
+                    location.reload(); // Recarrega para ver na tabela
+                } else {
+                    const data = await res.json();
+                    alert('Erro: ' + data.error);
+                }
+            } catch (err) { console.error(err); alert("Erro de conexão"); }
+        });
+
+        // 4. DELETAR
+        async function deletarPizza(id, nome) {
+            if (!confirm(`Tem certeza que deseja EXCLUIR a pizza "${nome}"?\nIsso não pode ser desfeito.`)) return;
+
+            try {
+                const res = await fetch(`/api/v1/pizzas/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    alert('🗑️ Pizza removida!');
+                    location.reload();
+                } else {
+                    alert('Erro ao deletar.');
+                }
+            } catch (err) { console.error(err); }
+        }
+
+        async function logout() {
+    try {
+        // Pede para o servidor destruir o cookie
+        await fetch('/api/v1/auth/logout', { method: 'POST' });
+        
+        // Redireciona para o login
+        window.location.href = '/login';
+    } catch (err) {
+        console.error("Erro ao sair", err);
+        // Se der erro, força o redirecionamento de qualquer jeito
+        window.location.href = '/login';
+    }
+}
+    </script>
+</body>
+</html>

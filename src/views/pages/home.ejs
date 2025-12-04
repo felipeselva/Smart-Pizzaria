@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Cardápio - Pizzaria Smart</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+<body class="bg-gray-100 min-h-screen relative overflow-x-hidden">
+
+    <nav class="bg-orange-600 text-white p-4 shadow-md flex justify-between items-center sticky top-0 z-40">
+        <div class="flex items-center gap-2">
+            <i class="ph ph-pizza text-3xl"></i>
+            <h1 class="text-2xl font-bold hidden md:block">Pizzaria Smart</h1>
+        </div>
+        
+        <div class="flex items-center gap-6">
+            <a href="/meus-pedidos" class="hover:text-orange-200 text-sm font-medium flex items-center gap-1">
+                <i class="ph ph-receipt"></i> Meus Pedidos
+            </a>
+            
+            <button onclick="toggleCart()" class="relative hover:text-orange-200 group">
+                <i class="ph ph-shopping-cart text-2xl group-hover:scale-110 transition"></i>
+                <span id="cartCount" class="absolute -top-2 -right-2 bg-white text-orange-600 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center opacity-0 transition-opacity shadow-sm">0</span>
+            </button>
+
+            <div class="h-6 w-px bg-orange-400"></div>
+            
+            <div class="flex items-center gap-2">
+                <span class="text-sm hidden sm:inline">Olá, <strong><%= user.nome %></strong></span>
+                <button onclick="logout()" class="text-xs bg-orange-800 px-3 py-1 rounded hover:bg-orange-900 ml-2">Sair</button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mx-auto p-6 pb-24">
+        <h2 class="text-3xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+            <i class="ph ph-book-open-text text-orange-600"></i> Nosso Cardápio
+        </h2>
+        
+        <div id="listaPizzas" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="col-span-full text-center py-10 text-gray-500">
+                <i class="ph ph-spinner animate-spin text-4xl"></i>
+                <p>Carregando cardápio...</p>
+            </div>
+        </div>
+    </main>
+
+    <div id="cartSidebar" class="fixed inset-y-0 right-0 w-full md:w-96 bg-white shadow-2xl transform translate-x-full transition-transform duration-300 z-50 flex flex-col">
+        
+        <div class="bg-gray-800 text-white p-4 flex justify-between items-center shadow-md">
+            <h2 class="text-xl font-bold flex items-center gap-2">
+                <i class="ph ph-basket text-orange-500"></i> Seu Pedido
+            </h2>
+            <button onclick="toggleCart()" class="text-gray-400 hover:text-white transition">
+                <i class="ph ph-x text-2xl"></i>
+            </button>
+        </div>
+
+        <div id="cartItems" class="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
+            </div>
+
+        <div class="p-4 border-t bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+            <div class="flex justify-between items-center mb-4">
+                <span class="text-gray-600 font-medium">Total do Pedido</span>
+                <span id="cartTotal" class="text-2xl font-bold text-orange-600">R$ 0,00</span>
+            </div>
+            <button onclick="finalizarCompra()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg shadow-lg transition transform hover:scale-[1.02] active:scale-95 flex justify-center items-center gap-2">
+                <span>FINALIZAR COMPRA</span>
+                <i class="ph ph-check-circle text-xl"></i>
+            </button>
+        </div>
+    </div>
+    
+    <div id="cartOverlay" onclick="toggleCart()" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity backdrop-blur-sm"></div>
+
+    <button onclick="toggleChat()" class="fixed bottom-6 right-6 bg-orange-600 text-white p-4 rounded-full shadow-2xl hover:bg-orange-700 transition transform hover:scale-110 z-30 flex items-center justify-center border-4 border-white">
+        <i class="ph ph-chat-teardrop-text text-3xl"></i>
+    </button>
+
+    <div id="chatWindow" class="fixed bottom-24 right-6 w-80 md:w-96 bg-white rounded-lg shadow-2xl z-50 hidden flex flex-col border border-gray-200 overflow-hidden" style="height: 450px;">
+        <div class="bg-gray-800 text-white p-3 flex justify-between items-center">
+            <span class="font-bold flex items-center gap-2">
+                <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div> Garçom IA
+            </span>
+            <button onclick="toggleChat()" class="text-gray-400 hover:text-white">&times;</button>
+        </div>
+        <div id="chatMessages" class="flex-1 p-4 overflow-y-auto bg-gray-50 space-y-3">
+            <div class="flex justify-start">
+                <div class="bg-gray-200 text-gray-800 p-3 rounded-lg rounded-tl-none max-w-[80%] text-sm shadow-sm">
+                    Olá! Sou a IA da pizzaria. Posso tirar dúvidas ou sugerir sabores! 🍕
+                </div>
+            </div>
+        </div>
+        <form id="chatForm" class="p-3 bg-white border-t flex gap-2">
+            <input type="text" id="chatInput" placeholder="Digite sua dúvida..." class="flex-1 border rounded-full px-4 py-2 text-sm focus:outline-none focus:border-orange-500 bg-gray-50">
+            <button type="submit" class="bg-orange-600 text-white p-2 rounded-full hover:bg-orange-700 transition"><i class="ph ph-paper-plane-right"></i></button>
+        </form>
+    </div>
+
+    <script>
+        // --- ESTADO DO CARRINHO (LOCALSTORAGE) ---
+        let carrinho = JSON.parse(localStorage.getItem('smartPizzaCart')) || [];
+
+        // 1. Carregar Cardápio
+        async function carregarPizzas() {
+            try {
+                const response = await fetch('/api/v1/pizzas');
+                const pizzas = await response.json();
+                const container = document.getElementById('listaPizzas');
+                
+                container.innerHTML = ''; 
+
+                pizzas.forEach(pizza => {
+                    const card = `
+                        <div class="bg-white p-6 rounded-xl shadow-sm hover:shadow-lg transition border border-gray-100 flex flex-col h-full group">
+                            <div class="flex justify-between items-start mb-2">
+                                <h3 class="text-xl font-bold text-gray-800 group-hover:text-orange-600 transition">${pizza.nome}</h3>
+                                <span class="bg-orange-100 text-orange-800 text-xs font-bold px-2 py-1 rounded-full uppercase">${pizza.categoria}</span>
+                            </div>
+                            <p class="text-gray-600 text-sm mb-4 flex-1 line-clamp-3">${pizza.descricao}</p>
+                            <div class="text-xs text-gray-400 mb-4">Ingr: ${pizza.ingredientes.join(', ')}</div>
+                            
+                            <div class="flex justify-between items-center pt-4 border-t border-gray-100 mt-auto">
+                                <span class="text-2xl font-black text-gray-800">R$ ${pizza.preco.toFixed(2)}</span>
+                                <button onclick="adicionarAoCarrinho('${pizza._id}', '${pizza.nome}', ${pizza.preco})" 
+                                    class="bg-orange-500 text-white px-4 py-2 rounded-lg font-bold hover:bg-orange-600 transition flex items-center gap-2 shadow-orange-200 shadow-lg active:scale-95">
+                                    <i class="ph ph-plus"></i> Adicionar
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    container.innerHTML += card;
+                });
+            } catch (error) { console.error("Erro:", error); }
+        }
+
+        // 2. Funções do Carrinho
+        function adicionarAoCarrinho(id, nome, preco) {
+            const itemExistente = carrinho.find(item => item.id === id);
+            
+            if (itemExistente) {
+                itemExistente.qtd += 1;
+            } else {
+                carrinho.push({ id, nome, preco, qtd: 1 });
+            }
+            salvarERenderizar();
+            toggleCart(true); // Abre o carrinho automaticamente
+        }
+
+        function removerDoCarrinho(id) {
+            carrinho = carrinho.filter(item => item.id !== id);
+            salvarERenderizar();
+        }
+
+        function alterarQtd(id, delta) {
+            const item = carrinho.find(i => i.id === id);
+            if (item) {
+                item.qtd += delta;
+                if (item.qtd <= 0) removerDoCarrinho(id);
+                else salvarERenderizar();
+            }
+        }
+
+        function salvarERenderizar() {
+            localStorage.setItem('smartPizzaCart', JSON.stringify(carrinho));
+            renderizarCarrinho();
+        }
+
+        function renderizarCarrinho() {
+            const container = document.getElementById('cartItems');
+            const totalEl = document.getElementById('cartTotal');
+            const countEl = document.getElementById('cartCount');
+            
+            // Badge
+            const totalItens = carrinho.reduce((acc, item) => acc + item.qtd, 0);
+            countEl.innerText = totalItens;
+            countEl.style.opacity = totalItens > 0 ? '1' : '0';
+
+            // Total Financeiro
+            const totalValor = carrinho.reduce((acc, item) => acc + (item.preco * item.qtd), 0);
+            totalEl.innerText = `R$ ${totalValor.toFixed(2)}`;
+
+            // Renderização da Lista
+            if (carrinho.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center text-gray-400 mt-20 flex flex-col items-center">
+                        <i class="ph ph-shopping-cart text-6xl mb-4 text-gray-200"></i>
+                        <p>Seu carrinho está vazio</p>
+                        <button onclick="toggleCart()" class="mt-4 text-orange-600 font-bold hover:underline">Voltar ao cardápio</button>
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = '';
+            carrinho.forEach(item => {
+                const subtotal = item.preco * item.qtd;
+                container.innerHTML += `
+                    <div class="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col gap-2">
+                        <div class="flex justify-between font-bold text-gray-800">
+                            <span>${item.nome}</span>
+                            <span>R$ ${subtotal.toFixed(2)}</span>
+                        </div>
+                        <div class="flex justify-between items-center text-sm text-gray-500">
+                            <span>R$ ${item.preco.toFixed(2)} un.</span>
+                            
+                            <div class="flex items-center gap-3 bg-gray-100 rounded px-2 py-1">
+                                <button onclick="alterarQtd('${item.id}', -1)" class="hover:text-red-500 px-1 font-bold">-</button>
+                                <span class="font-mono font-bold text-gray-800 w-4 text-center">${item.qtd}</span>
+                                <button onclick="alterarQtd('${item.id}', 1)" class="hover:text-green-500 px-1 font-bold">+</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function toggleCart(forceOpen = false) {
+            const sidebar = document.getElementById('cartSidebar');
+            const overlay = document.getElementById('cartOverlay');
+            if (forceOpen) {
+                sidebar.classList.remove('translate-x-full');
+                overlay.classList.remove('hidden');
+            } else {
+                sidebar.classList.toggle('translate-x-full');
+                overlay.classList.toggle('hidden');
+            }
+        }
+
+        // 3. FINALIZAR COMPRA (Checkout em Lote)
+        async function finalizarCompra() {
+            if (carrinho.length === 0) return alert("Carrinho vazio!");
+
+            // UX: Botão carregando
+            const btn = document.querySelector('#cartSidebar button.bg-green-600');
+            const textoOriginal = btn.innerHTML;
+            btn.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i> Enviando...';
+            btn.disabled = true;
+
+            // Formata payload para a API
+            const payload = {
+                itens: carrinho.map(item => ({
+                    pizzaId: item.id,
+                    quantidade: item.qtd
+                }))
+            };
+
+            try {
+                const response = await fetch('/api/v1/orders', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Limpa tudo e redireciona
+                    carrinho = [];
+                    salvarERenderizar();
+                    toggleCart();
+                    // Pequeno delay pra ver o sucesso
+                    setTimeout(() => window.location.href = '/meus-pedidos', 500);
+                } else {
+                    alert('Erro: ' + data.error);
+                    btn.innerHTML = textoOriginal;
+                    btn.disabled = false;
+                }
+            } catch (error) {
+                console.error(error);
+                alert('Erro de conexão.');
+                btn.innerHTML = textoOriginal;
+                btn.disabled = false;
+            }
+        }
+
+        // Funções Auxiliares (Logout / Chat)
+        async function logout() {
+    try {
+        // Pede para o servidor destruir o cookie
+        await fetch('/api/v1/auth/logout', { method: 'POST' });
+        
+        // Redireciona para o login
+        window.location.href = '/login';
+    } catch (err) {
+        console.error("Erro ao sair", err);
+        // Se der erro, força o redirecionamento de qualquer jeito
+        window.location.href = '/login';
+    }
+}
+        function toggleChat() { document.getElementById('chatWindow').classList.toggle('hidden'); }
+
+        // --- CHATBOT LOGIC ---
+        document.getElementById('chatForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            if(!message) return;
+            
+            const container = document.getElementById('chatMessages');
+            container.innerHTML += `<div class="flex justify-end"><div class="bg-orange-600 text-white p-3 rounded-lg rounded-tr-none max-w-[80%] text-sm shadow">${message}</div></div>`;
+            input.value = '';
+            container.scrollTop = container.scrollHeight;
+
+            try {
+                const res = await fetch('/api/v1/chat', {
+                    method: 'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({message})
+                });
+                const data = await res.json();
+                
+                // Exibe resposta
+                container.innerHTML += `<div class="flex justify-start"><div class="bg-gray-200 text-gray-800 p-3 rounded-lg rounded-tl-none max-w-[80%] text-sm shadow">${data.reply}</div></div>`;
+                container.scrollTop = container.scrollHeight;
+
+            } catch(e) { console.error(e); }
+        });
+
+        // Inicialização
+        carregarPizzas();
+        renderizarCarrinho();
+    </script>
+</body>
+</html>

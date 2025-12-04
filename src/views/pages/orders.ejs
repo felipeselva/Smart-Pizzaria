@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Meus Pedidos - Pizzaria Smart</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+    <nav class="bg-orange-600 text-white p-4 shadow-md flex justify-between items-center sticky top-0 z-50">
+        <div class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition" onclick="window.location.href='/'">
+            <i class="ph ph-arrow-left text-2xl"></i>
+            <h1 class="text-2xl font-bold">Voltar ao Cardápio</h1>
+        </div>
+        <div class="flex items-center gap-2">
+            <i class="ph ph-user-circle text-xl"></i>
+            <span><%= user.nome %></span>
+        </div>
+    </nav>
+
+    <main class="container mx-auto p-6 max-w-4xl">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-3xl font-bold text-gray-800 flex items-center gap-2">
+                <i class="ph ph-receipt"></i> Histórico de Pedidos
+            </h2>
+            <button onclick="carregarPedidos()" class="text-sm text-orange-600 hover:underline">Atualizar Lista</button>
+        </div>
+
+        <div id="listaPedidos" class="space-y-4">
+            <div class="flex flex-col items-center justify-center py-10 text-gray-500 animate-pulse">
+                <i class="ph ph-spinner text-4xl animate-spin mb-2"></i>
+                <p>Buscando seus pedidos...</p>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // --- 1. FUNÇÃO DE BUSCAR PEDIDOS ---
+        async function carregarPedidos() {
+            const container = document.getElementById('listaPedidos');
+            
+            try {
+                const response = await fetch('/api/v1/orders');
+                const pedidos = await response.json();
+                
+                container.innerHTML = ''; // Limpa o loading
+
+                if (pedidos.length === 0) {
+                    container.innerHTML = `
+                        <div class="text-center py-10 bg-white rounded-lg shadow">
+                            <i class="ph ph-pizza text-4xl text-gray-300 mb-2"></i>
+                            <p class="text-gray-500">Você ainda não tem pedidos.</p>
+                            <a href="/" class="text-orange-600 font-bold mt-2 inline-block">Fazer meu primeiro pedido</a>
+                        </div>
+                    `;
+                    return;
+                }
+
+                pedidos.forEach(pedido => {
+                    const data = new Date(pedido.dataCriacao).toLocaleString('pt-BR');
+                    
+                    // Cores dos Status
+                    const statusMap = {
+                        'Recebido': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+                        'Em Preparo': 'bg-orange-100 text-orange-800 border-orange-200',
+                        'Saiu para Entrega': 'bg-blue-100 text-blue-800 border-blue-200',
+                        'Entregue': 'bg-green-100 text-green-800 border-green-200'
+                    };
+                    const statusClass = statusMap[pedido.status] || 'bg-gray-100 text-gray-800';
+
+                    const itensHtml = pedido.itens.map(item => 
+                        `<li class="flex justify-between text-gray-600 border-b border-gray-100 last:border-0 py-1">
+                            <span>${item.quantidade}x <strong>${item.pizza ? item.pizza.nome : 'Item removido'}</strong></span>
+                        </li>`
+                    ).join('');
+
+                    const card = `
+                        <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition relative overflow-hidden">
+                            <div class="absolute left-0 top-0 bottom-0 w-1 ${statusClass.replace('bg-', 'bg-opacity-50 bg-')}"></div>
+                            
+                            <div class="flex justify-between items-start mb-4 pl-3">
+                                <div>
+                                    <p class="text-xs text-gray-400 font-bold uppercase tracking-wider">Pedido #${pedido._id.toString().slice(-6)}</p>
+                                    <p class="text-xs text-gray-500">${data}</p>
+                                </div>
+                                <span class="${statusClass} px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide border">
+                                    ${pedido.status}
+                                </span>
+                            </div>
+                            
+                            <ul class="mb-4 text-sm bg-gray-50 p-3 rounded pl-3">
+                                ${itensHtml}
+                            </ul>
+
+                            <div class="flex justify-between items-center border-t pt-3 pl-3">
+                                <span class="text-sm text-gray-500">Total do Pedido</span>
+                                <span class="text-xl font-bold text-gray-800">R$ ${pedido.total.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    `;
+                    container.innerHTML += card;
+                });
+
+            } catch (error) {
+                console.error("Erro:", error);
+                container.innerHTML = '<p class="text-red-500 text-center">Erro ao carregar pedidos. Verifique o console.</p>';
+            }
+        }
+
+        // --- 2. INICIALIZAÇÃO ---
+        // Carrega a lista imediatamente
+        carregarPedidos();
+
+        // --- 3. SOCKET.IO (TEMPO REAL) ---
+        try {
+            const socket = io();
+            // Pega o ID do usuário que o EJS injetou
+            const userId = "<%= user.id %>"; 
+
+            console.log("🔌 Conectando ao Socket para updates do user:", userId);
+
+            // Ouve atualizações de status
+            socket.on(`status_update_${userId}`, (dados) => {
+                console.log("🔔 Update recebido!", dados);
+                // Toca um som suave
+                const audio = new Audio('https://actions.google.com/sounds/v1/cartoon/pop.ogg');
+                audio.volume = 0.5;
+                audio.play().catch(e => console.log("Audio bloqueado pelo browser"));
+                
+                // Recarrega a lista para mostrar o novo status
+                carregarPedidos();
+            });
+            
+        } catch (err) {
+            console.error("Erro ao iniciar Socket.io:", err);
+        }
+    </script>
+</body>
+</html>
