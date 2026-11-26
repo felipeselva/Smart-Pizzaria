@@ -52,3 +52,35 @@ Desenvolvido para demonstrar a aplicação prática de tecnologias modernas inte
 2. Instale as dependências:
    ```bash
    npm install
+   ```
+3. Crie um arquivo `.env` na raiz com as suas credenciais:
+   ```env
+   PORT=3000
+   MONGO_URI=sua_string_de_conexao_mongodb
+   GEMINI_API_KEY=sua_chave_api_gemini
+   JWT_SECRET=sua_chave_secreta_jwt
+   ```
+4. Inicie o servidor:
+   ```bash
+   npm start
+   ```
+5. Acesse a versão Web em `http://localhost:3000`.
+
+### 2. Aplicativo Mobile (React Native / Expo)
+1. Acesse a pasta do projeto mobile (`smart-pizzaria-mobile`) e instale as dependências:
+   ```bash
+   npm install
+   ```
+2. Configure o endereço IPv4 da sua máquina (onde o backend está rodando) nos arquivos de conexão:
+   * `src/services/api.js` (na `baseURL`)
+   * `src/screens/KDS.js` (na constante `SOCKET_URL`)
+   * `src/screens/MyOrders.js` (na constante `SOCKET_URL`)
+3. Inicie o servidor do Expo:
+   ```bash
+   npx expo start
+   ```
+4. Escaneie o QR Code com o aplicativo **Expo Go** (certifique-se de que o celular e o computador estejam na mesma rede).
+
+---
+
+Desenvolvido por **Felipe Selva**
